@@ -1,0 +1,21 @@
+{
+  "name": "airline-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.3",
+    "@langchain/langgraph": "^0.3",
+    "@langchain/openai": "^0.5",
+    "dotenv": "^16.4",
+    "zod": "^3.24"
+  },
+  "packageManager": "pnpm@10.11.0",
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4.19",
+    "typescript": "^5.7"
+  }
+}
