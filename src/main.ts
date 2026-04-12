@@ -4,12 +4,16 @@ import { HumanMessage } from "@langchain/core/messages";
 import { Command } from "@langchain/langgraph";
 import { app } from "./agent/graph.js";
 import { createInterface } from "readline/promises";
+import { CoordinatorAgent } from "./mas/coordinator.js";
+import { EnhancedCoordinator } from "./mas/enhancedCoordinator.js";
+import { createSpecialists } from "./mas/index.js";
+import { runBenchmark } from "./benchmark/runner.js";
 
-async function main() {
+async function runSingleAgentRepl() {
   const threadId = randomUUID();
   const config = { configurable: { thread_id: threadId } };
 
-  console.log("Airline Agent (type 'quit' to exit)");
+  console.log("Single Agent (ReAct) — type 'quit' to exit");
   console.log(`Thread: ${threadId}`);
   console.log("-".repeat(40));
 
@@ -65,6 +69,65 @@ async function main() {
     const state = await app.getState(config);
     const messages = state.values.messages as Array<{ content: string }>;
     console.log(`\nAgent: ${messages[messages.length - 1].content}`);
+  }
+}
+
+async function runMasRepl(useCritic = false) {
+  const specialists = createSpecialists();
+  const label = useCritic ? "MAS + Critic" : "MAS";
+  const coordinator = useCritic
+    ? new EnhancedCoordinator(specialists)
+    : new CoordinatorAgent(specialists);
+
+  console.log(`${label} — type 'quit' to exit`);
+  console.log("-".repeat(40));
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+  while (true) {
+    const userInput = (await rl.question("\nYou: ")).trim();
+    if (!userInput) continue;
+    if (userInput.toLowerCase() === "quit" || userInput.toLowerCase() === "exit") {
+      console.log("Goodbye!");
+      rl.close();
+      break;
+    }
+
+    if (useCritic) {
+      await (coordinator as EnhancedCoordinator).processQueryWithQC(userInput);
+    } else {
+      await coordinator.processQuery(userInput);
+    }
+  }
+}
+
+async function main() {
+  console.log("Airline Agent");
+  console.log("Select mode:");
+  console.log("  1. Single Agent (ReAct)");
+  console.log("  2. Multi-Agent System (MAS)");
+  console.log("  3. MAS + Critic");
+  console.log("  4. Run Benchmark");
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const choice = (await rl.question("> ")).trim();
+  rl.close();
+
+  switch (choice) {
+    case "1":
+      await runSingleAgentRepl();
+      break;
+    case "2":
+      await runMasRepl(false);
+      break;
+    case "3":
+      await runMasRepl(true);
+      break;
+    case "4":
+      await runBenchmark();
+      break;
+    default:
+      console.log("Invalid choice. Exiting.");
   }
 }
 

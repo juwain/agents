@@ -1,5 +1,5 @@
 import { MessagesAnnotation } from "@langchain/langgraph";
-import { SystemMessage } from "@langchain/core/messages";
+import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { llm } from "../llm.js";
 import { ALL_TOOLS } from "../tools/index.js";
 import { buildSystemPrompt } from "../prompts.js";
@@ -21,5 +21,26 @@ export async function agentNode(
   ];
 
   const response = await llmWithTools.invoke(messages);
+
+  // Thought extraction: if LLM calls a tool without reasoning text,
+  // make an extra call to extract the thought behind the action.
+  const hasTextContent =
+    typeof response.content === "string"
+      ? response.content.trim().length > 0
+      : Array.isArray(response.content) && response.content.length > 0;
+  if (response.tool_calls && response.tool_calls.length > 0 && !hasTextContent) {
+    const toolInfo = response.tool_calls.map((tc) => tc.name).join(", ");
+    const thought = await llm.invoke([
+      ...messages,
+      new HumanMessage({
+        content:
+          `You chose to call: ${toolInfo}. ` +
+          "In 1 sentence, explain why this is the right next step. " +
+          "Reply with ONLY your reasoning, no tool calls.",
+      }),
+    ]);
+    response.content = thought.content;
+  }
+
   return { messages: [response] };
 }
